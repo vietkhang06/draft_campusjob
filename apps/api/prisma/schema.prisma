@@ -1,0 +1,476 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  student
+  employer
+  moderator
+  admin
+}
+
+enum UserStatus {
+  pending_verification
+  active
+  suspended
+  locked
+}
+
+model User {
+  id                  String     @id @default(uuid())
+  email               String     @unique
+  passwordHash        String?
+  name                String
+  role                UserRole   @default(student)
+  status              UserStatus @default(active)
+  emailVerifiedAt     DateTime?
+  failedLoginAttempts Int        @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  profile             Json       @default("{}")
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  sessions               AuthSession[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens    PasswordResetToken[]
+  company                Company?
+  cvs                    CV[]
+  applications           Application[]
+  savedJobs              SavedJob[]
+  reviews                Review[]
+  reportsCreated         Report[]                 @relation("UserReportsCreated")
+  sanctionsReceived      Sanction[]               @relation("UserSanctionsReceived")
+  sanctionsIssued        Sanction[]               @relation("UserSanctionsIssued")
+  notifications          Notification[]
+  files                  File[]
+  messagesSent           Message[]
+  schoolVerification     SchoolVerification?
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model AuthSession {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String
+  tokenFamily String
+  userAgent   String?
+  ipAddress   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenFamily])
+  @@map("auth_sessions")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+model Company {
+  id          String   @id @default(uuid())
+  ownerId     String   @unique
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  name        String
+  tax         String   @unique
+  address     String
+  phone       String
+  email       String
+  website     String?
+  industry    String
+  size        String
+  hr          String
+  description String   @default("")
+  license     String?
+  status      String   @default("pending") // pending, active, rejected, suspended
+  reason      String?
+  flag        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branches Branch[]
+  jobs     Job[]
+  orders   Order[]
+  reviews  Review[]
+
+  @@index([status])
+  @@map("companies")
+}
+
+model Branch {
+  id        String  @id @default(uuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  address   String
+  city      String
+  lat       Float?
+  lng       Float?
+
+  jobs Job[]
+
+  @@index([companyId])
+  @@map("branches")
+}
+
+model Job {
+  id            String    @id @default(uuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId      String
+  branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  title         String
+  industry      String
+  type          String
+  description   String
+  skills        String
+  preferred     String    @default("")
+  vacancies     Int
+  salaryMin     Int?
+  salaryMax     Int?
+  salaryUnit    String    @default("month")
+  schedule      String
+  benefits      String
+  deadline      DateTime
+  featuredUntil DateTime?
+  status        String    @default("pending") // pending, open, paused, closed, rejected
+  reason        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  applications Application[]
+  savedBy      SavedJob[]
+  views        JobView[]
+  orders       Order[]
+
+  @@index([status, deadline])
+  @@index([companyId])
+  @@map("jobs")
+}
+
+model CV {
+  id        String   @id @default(uuid())
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  name      String
+  data      Json
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications Application[]
+
+  @@index([studentId])
+  @@map("cvs")
+}
+
+model Application {
+  id        String   @id @default(uuid())
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  cvId      String
+  cv        CV       @relation(fields: [cvId], references: [id], onDelete: Restrict)
+  snapshot  Json
+  letter    String   @default("")
+  score     Float
+  status    String   @default("pending") // pending, viewed, interview, hired, not_hired, rejected, withdrawn
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  interview Interview?
+  review    Review?
+  reports   Report[]
+  messages  Message[]
+
+  @@unique([studentId, jobId])
+  @@index([studentId, status])
+  @@index([jobId])
+  @@map("applications")
+}
+
+model Interview {
+  id              String    @id @default(uuid())
+  applicationId   String    @unique
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  time            DateTime
+  mode            String    // onsite, online
+  location        String
+  message         String
+  response        String    @default("invited") // invited, confirmed, reschedule_requested
+  rescheduleUsed  Boolean   @default(false)
+  proposed        DateTime?
+  requestReason   String?
+  decision        String?
+  createdAt       DateTime  @default(now())
+
+  @@map("interviews")
+}
+
+model SavedJob {
+  id        String   @id @default(uuid())
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([studentId, jobId])
+  @@map("saved")
+}
+
+model JobView {
+  id        String   @id @default(uuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  visitorId String
+  day       String   // YYYY-MM-DD
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, visitorId, day])
+  @@map("views")
+}
+
+model Review {
+  id            String      @id @default(uuid())
+  applicationId String      @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       User        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  companyId     String
+  company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  rating        Int
+  comment       String
+  reply         String?
+  hidden        Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+
+  @@index([companyId])
+  @@map("reviews")
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  reporterId     String
+  reporter       User         @relation("UserReportsCreated", fields: [reporterId], references: [id], onDelete: Restrict)
+  targetId       String
+  targetType     String       // company, student
+  applicationId  String?
+  application    Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  kind           String       // fraud, no_show, left_early
+  description    String
+  evidence       String?
+  status         String       @default("pending") // pending, reviewed, confirmed, dismissed
+  recommendation String?
+  decision       String?
+  resolvedBy     String?
+  occurred       DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  sanctions Sanction[]
+
+  @@unique([applicationId, kind])
+  @@index([targetId, status])
+  @@index([status])
+  @@map("reports")
+}
+
+model Sanction {
+  id        String    @id @default(uuid())
+  targetId  String
+  target    User      @relation("UserSanctionsReceived", fields: [targetId], references: [id], onDelete: Cascade)
+  kind      String    // warning, application_lock, company_suspension
+  reason    String
+  until     DateTime?
+  reportId  String?
+  report    Report?   @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  actorId   String
+  actor     User      @relation("UserSanctionsIssued", fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt DateTime  @default(now())
+
+  @@index([targetId, until])
+  @@map("sanctions")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  recipientId String
+  recipient   User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  kind        String
+  title       String
+  body        String
+  url         String
+  read        Boolean  @default(false)
+  dedupe      String?  @unique
+  createdAt   DateTime @default(now())
+
+  emails EmailQueue[]
+
+  @@index([recipientId, createdAt])
+  @@map("notifications")
+}
+
+model File {
+  id        String   @id @default(uuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  mime      String
+  size      Int
+  purpose   String   // avatar, license, evidence
+  createdAt DateTime @default(now())
+
+  @@map("files")
+}
+
+model Message {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  senderId      String
+  sender        User        @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  body          String
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId, createdAt])
+  @@map("messages")
+}
+
+model History {
+  id        String   @id @default(uuid())
+  entity    String
+  entityId  String
+  action    String
+  actor     String
+  detail    Json
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@map("history")
+}
+
+model Setting {
+  key   String @id
+  value String
+
+  @@map("settings")
+}
+
+model EmailQueue {
+  id             String        @id @default(uuid())
+  notificationId String?
+  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  recipient      String
+  subject        String
+  body           String
+  status         String        @default("queued") // queued, sent, failed
+  attempts       Int           @default(0)
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([status])
+  @@map("email_queue")
+}
+
+model RateLimit {
+  key    String @id
+  count  Int
+  window String
+
+  @@map("rate_limits")
+}
+
+model SchoolVerification {
+  userId     String    @id
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String
+  hash       String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("school_verifications")
+}
+
+model Plan {
+  id        String   @id @default(uuid())
+  name      String
+  amount    Int
+  days      Int
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  orders Order[]
+
+  @@map("plans")
+}
+
+model Order {
+  id        String    @id @default(uuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  jobId     String
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  planId    String
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  amount    Int
+  days      Int
+  status    String    @default("pending") // pending, paid, failed, expired
+  session   String?   @unique
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  paymentEvents PaymentEvent[]
+
+  @@index([companyId])
+  @@map("orders")
+}
+
+model PaymentEvent {
+  id        String   @id
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+
+  @@map("payment_events")
+}

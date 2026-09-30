@@ -1,0 +1,32 @@
+export interface AppConfig {
+    nodeEnv: string;
+    port: number;
+    webOrigin: string[];
+    apiOrigin: string;
+    databaseUrl: string;
+    jwtAccessSecret: string;
+    jwtAccessTtl: string;
+    refreshTokenTtlDays: number;
+    cookieSecure: boolean;
+    cookieDomain?: string;
+    smtpHost: string;
+    smtpPort: number;
+    smtpUser?: string;
+    smtpPassword?: string;
+    mailFrom: string;
+    storageDriver: 'local' | 's3';
+    localStoragePath: string;
+    s3Endpoint: string;
+    s3Region: string;
+    s3Bucket: string;
+    s3AccessKey: string;
+    s3SecretKey: string;
+    s3ForcePathStyle: boolean;
+    stripeSecretKey?: string;
+    stripeWebhookSecret?: string;
+    adminBootstrapPassword?: string;
+}
+export declare function validateEnvironment(): void;
+export declare const validateEnv: typeof validateEnvironment;
+declare const _default: () => AppConfig;
+export default _default;
