@@ -10,6 +10,7 @@
     "test": "pnpm --filter @campusjob/api test",
     "test:e2e": "pnpm --filter @campusjob/api test:e2e",
     "db:migrate": "pnpm --filter @campusjob/api prisma:migrate",
+    "db:seed": "pnpm --filter @campusjob/api prisma:seed",
     "db:generate": "pnpm --filter @campusjob/api prisma:generate",
     "admin:create": "pnpm --filter @campusjob/api admin:create"
   },

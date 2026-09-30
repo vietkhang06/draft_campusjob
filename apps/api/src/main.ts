@@ -19,7 +19,8 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // Cookie parser
-  app.use(cookieParser());
+  const cookieMiddleware = typeof cookieParser === 'function' ? cookieParser : (cookieParser as any).default;
+  app.use(cookieMiddleware());
 
   // CORS configuration (allow credentials, explicit origins)
   const allowedOrigins = Array.isArray(webOrigin)

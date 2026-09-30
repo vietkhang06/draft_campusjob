@@ -85,19 +85,24 @@ docker compose -f infra/docker-compose.yml ps
 ```
 *(Kết quả hiển thị `campusjob-postgres` ở port `5434:5432` và `campusjob-mailpit` ở port `1025/8025` ở trạng thái Healthy / Up).*
 
-#### Bước 4: Tạo cấu trúc cơ sở dữ liệu (Prisma Generate & Migrate)
-Chạy migration để khởi tạo 26 bảng dữ liệu trên PostgreSQL:
+#### Bước 4: Tạo cấu trúc cơ sở dữ liệu & Nạp dữ liệu mẫu (Prisma Migrate & Seed)
+Chạy migration để khởi tạo 26 bảng dữ liệu trên PostgreSQL và nạp sẵn tài khoản Quản trị viên mặc định:
 ```powershell
 pnpm db:generate
 pnpm db:migrate
+pnpm db:seed
 ```
+Lệnh `pnpm db:seed` sẽ tự động khởi tạo **Tài khoản Quản trị viên (Admin) mặc định**:
+* **Email:** `admin@campusjob.vn`
+* **Mật khẩu:** `Admin@12345678`
+* **Vai trò:** `admin`
 
-#### Bước 5: Khởi tạo tài khoản Quản trị viên đầu tiên (Admin Bootstrap)
-Hệ thống **không chứa mật khẩu mặc định hoặc tài khoản backdoor**. Khởi tạo tài khoản Admin đầu tiên qua công cụ CLI:
+#### Bước 5: (Tùy chọn) Khởi tạo thêm Quản trị viên tùy chỉnh (CLI)
+Nếu muốn tạo thêm tài khoản Quản trị viên riêng biệt bằng CLI:
 ```powershell
-pnpm admin:create --email admin@campusjob.vn --name "System Admin"
+pnpm admin:create --email your-admin@campusjob.vn --name "System Admin"
 ```
-*CLI sẽ yêu cầu nhập mật khẩu bảo mật trực tiếp trên terminal (hoặc bạn có thể truyền `--password <mat_khau>`)*.
+*(CLI sẽ prompt nhập mật khẩu trực tiếp từ terminal hoặc bạn có thể truyền `--password <mat_khau>`)*.
 
 #### Bước 6: Khởi chạy môi trường phát triển (Development)
 Chạy lệnh khởi động đồng thời cả Frontend và Backend:
@@ -238,7 +243,8 @@ Dự án cung cấp hệ thống lệnh điều phối tập trung tại thư m�
 | `pnpm test:e2e` | Chạy bộ kiểm thử tích hợp End-to-End API (Supertest) |
 | `pnpm db:generate` | Biên dịch lại Prisma Client dựa trên `schema.prisma` mới nhất |
 | `pnpm db:migrate` | Áp dụng các thay đổi cấu trúc bảng vào cơ sở dữ liệu PostgreSQL |
-| `pnpm admin:create` | Công cụ dòng lệnh cấp quyền tài khoản Quản trị viên (Admin) đầu tiên |
+| `pnpm db:seed` | Nạp tài khoản Quản trị viên (Admin) mặc định và dữ liệu mẫu |
+| `pnpm admin:create` | Công cụ dòng lệnh cấp quyền tài khoản Quản trị viên (Admin) tùy chỉnh |
 
 ---
 
